@@ -1,0 +1,99 @@
+package alert
+
+import (
+	"bytes"
+	"encoding/json"
+
+	"github.com/KoyomiKun/grafana-cli/pkg/client"
+	"github.com/KoyomiKun/grafana-cli/pkg/grafana"
+	"github.com/KoyomiKun/grafana-cli/utils/log"
+)
+
+type TagManager struct {
+	client *client.Client
+	alerts []Alert
+}
+
+func NewTagManager(
+	client *client.Client,
+	alerts []Alert) *TagManager {
+
+	return &TagManager{
+		client: client,
+		alerts: alerts,
+	}
+}
+
+func (tu *TagManager) Update() {
+	// group config.alerts by dashboard && panel
+	dashboardUidToPanelIdToTags := make(map[string]map[int]map[string]string)
+
+	for _, alert := range tu.alerts {
+
+		content, err := tu.client.GetApi(
+			"/api/alerts",
+			map[string]string{},
+			map[string]string{
+				"query": alert.AlertName,
+			})
+		if err != nil {
+			log.Warnf("Fail get alerts: %v", err)
+			continue
+		}
+
+		alerts, err := grafana.NewAlerts(content)
+		if err != nil {
+			log.Warnf("Fail create alerts: %v", err)
+			continue
+		}
+
+		for _, a := range alerts {
+			_, ok := dashboardUidToPanelIdToTags[a.DashboardUid]
+			if !ok {
+				dashboardUidToPanelIdToTags[a.DashboardUid] = make(map[int]map[string]string)
+			}
+			_, ok = dashboardUidToPanelIdToTags[a.DashboardUid][a.PanelId]
+			if !ok {
+				dashboardUidToPanelIdToTags[a.DashboardUid][a.PanelId] = make(map[string]string)
+			}
+			for k, v := range alert.Tags {
+				dashboardUidToPanelIdToTags[a.DashboardUid][a.PanelId][k] = v
+			}
+		}
+	}
+
+	// modify dashboard
+	for dashboardUid, panelIdToTags := range dashboardUidToPanelIdToTags {
+		content, err := tu.client.GetApi(
+			"/api/dashboards/uid/"+dashboardUid,
+			map[string]string{},
+			map[string]string{})
+		if err != nil {
+			log.Warnf("Fail getting dashboard %s: %v", dashboardUid, err)
+			continue
+		}
+		dashboard, err := grafana.NewDashboard(content)
+		if err != nil {
+			log.Warnf("Fail creating dashbaord %s: %v", dashboardUid, err)
+			continue
+		}
+
+		dashboard.UpdateAlert(panelIdToTags)
+
+		body, err := json.Marshal(dashboard)
+		if err != nil {
+			log.Warnf("Fail marshaling dashboard %s: %v", dashboardUid, err)
+			continue
+		}
+		resp, err := tu.client.PostApi(
+			"/api/dashboards/db",
+			map[string]string{},
+			bytes.NewBuffer(body),
+		)
+		if err != nil {
+			log.Warnf("Fail post %s: %v", dashboardUid, err)
+			continue
+		}
+		log.Infof("resp: %s", resp)
+	}
+}
