@@ -1,36 +1,39 @@
-package alert
+package manager
 
 import (
 	"bytes"
 	"encoding/json"
 
 	"github.com/KoyomiKun/grafana-cli/pkg/client"
+	"github.com/KoyomiKun/grafana-cli/pkg/config"
 	"github.com/KoyomiKun/grafana-cli/pkg/grafana"
 	"github.com/KoyomiKun/grafana-cli/utils/log"
 )
 
 type TagManager struct {
-	client *client.Client
-	alerts []Alert
+	dbManager *DashboardManager
+	alerts    []config.Alert
 }
 
 func NewTagManager(
 	client *client.Client,
-	alerts []Alert) *TagManager {
+	alerts []config.Alert) *TagManager {
 
 	return &TagManager{
-		client: client,
-		alerts: alerts,
+		dbManager: NewDashboardManager(client),
+		alerts:    alerts,
 	}
 }
 
-func (tu *TagManager) Update() {
+func (tm *TagManager) Update() {
+
+	client := tm.dbManager.client
 	// group config.alerts by dashboard && panel
 	dashboardUidToPanelIdToTags := make(map[string]map[int]map[string]string)
 
-	for _, alert := range tu.alerts {
+	for _, alert := range tm.alerts {
 
-		content, err := tu.client.GetApi(
+		content, err := client.GetApi(
 			"/api/alerts",
 			map[string]string{},
 			map[string]string{
@@ -64,17 +67,9 @@ func (tu *TagManager) Update() {
 
 	// modify dashboard
 	for dashboardUid, panelIdToTags := range dashboardUidToPanelIdToTags {
-		content, err := tu.client.GetApi(
-			"/api/dashboards/uid/"+dashboardUid,
-			map[string]string{},
-			map[string]string{})
+		dashboard, err := tm.dbManager.GetByUid(dashboardUid)
 		if err != nil {
-			log.Warnf("Fail getting dashboard %s: %v", dashboardUid, err)
-			continue
-		}
-		dashboard, err := grafana.NewDashboard(content)
-		if err != nil {
-			log.Warnf("Fail creating dashbaord %s: %v", dashboardUid, err)
+			log.Warnf("Fail getting dashboard by uid %s: %v", dashboardUid, err)
 			continue
 		}
 
@@ -85,7 +80,7 @@ func (tu *TagManager) Update() {
 			log.Warnf("Fail marshaling dashboard %s: %v", dashboardUid, err)
 			continue
 		}
-		resp, err := tu.client.PostApi(
+		_, err = client.PostApi(
 			"/api/dashboards/db",
 			map[string]string{},
 			bytes.NewBuffer(body),
@@ -94,6 +89,5 @@ func (tu *TagManager) Update() {
 			log.Warnf("Fail post %s: %v", dashboardUid, err)
 			continue
 		}
-		log.Infof("resp: %s", resp)
 	}
 }

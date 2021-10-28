@@ -72,7 +72,9 @@ func (c *Client) GetApi(
 		log.Errorf("Fail read response %s: %v\n", url, err)
 		return nil, err
 	}
-
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("Fail requset %s: code = %d, msg = %s", url, resp.StatusCode, ret)
+	}
 	return ret, nil
 }
 
@@ -112,6 +114,8 @@ func (c *Client) PostApi(
 		log.Errorf("Fail read response %s: %v\n", url, err)
 		return nil, err
 	}
-
+	if resp.StatusCode != http.StatusOK {
+		log.Errorf("Fail requset %s: code = %d, msg = %s", url, resp.StatusCode, ret)
+	}
 	return ret, nil
 }
