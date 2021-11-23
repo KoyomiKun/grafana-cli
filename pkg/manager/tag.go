@@ -1,9 +1,6 @@
 package manager
 
 import (
-	"bytes"
-	"encoding/json"
-
 	"github.com/KoyomiKun/grafana-cli/pkg/client"
 	"github.com/KoyomiKun/grafana-cli/pkg/config"
 	"github.com/KoyomiKun/grafana-cli/pkg/grafana"
@@ -75,19 +72,9 @@ func (tm *TagManager) Update() {
 
 		dashboard.UpdateAlert(panelIdToTags)
 
-		body, err := json.Marshal(dashboard)
+		err = tm.dbManager.Update(dashboard)
 		if err != nil {
-			log.Warnf("Fail marshaling dashboard %s: %v", dashboardUid, err)
-			continue
-		}
-		_, err = client.PostApi(
-			"/api/dashboards/db",
-			map[string]string{},
-			bytes.NewBuffer(body),
-		)
-		if err != nil {
-			log.Warnf("Fail post %s: %v", dashboardUid, err)
-			continue
+			log.Warnf("Fail update dashboard %s: %v", dashboardUid, err)
 		}
 	}
 }

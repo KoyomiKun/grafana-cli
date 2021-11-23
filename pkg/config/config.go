@@ -14,8 +14,13 @@ type Alert struct {
 }
 
 type Target struct {
-	RefId string `json:"ref_id,omitempty"`
-	Expr  string `json:"expr,omitempty"`
+	DashboardUid string `json:"dashboard_uid"`
+	Panels       Panels `json:"panels,omitempty"`
+}
+
+type Panels map[int][]struct {
+	RefId string `json:"ref_id"`
+	Expr  string `json:"expr"`
 }
 
 type Config struct {
@@ -41,5 +46,5 @@ func NewConfig(cfgPath string) (*Config, error) {
 		log.Errorf("Fail unmarshaling config file %s: %v\n", cfgPath, err)
 		return nil, err
 	}
-	return nil, err
+	return config, nil
 }

@@ -9,7 +9,7 @@ import (
 var logger *log.Logger
 
 func init() {
-	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.LUTC)
+	logger = log.New(os.Stdout, "", log.Ldate|log.Ltime|log.Lmicroseconds|log.LUTC|log.Lshortfile)
 }
 
 func Infof(format string, args ...interface{}) {
